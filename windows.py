@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Tuple, Any, Union
 
+import matplotlib.axes
 import numpy as np
 
 
@@ -182,7 +183,8 @@ class CircularWindow(Window):
                                  sub_window_target)
         return sub_window, selected_area, background
 
-    def show_masks(self, target_x: float, target_y: float, print_debug=False) -> Tuple[np.ndarray, np.ndarray]:
+    def show_masks(self, target_x: float, target_y: float, ax: matplotlib.axes.Axes, print_debug=False) \
+            -> None:
         """For debugging, return an array indicating the masks within the sub-window"""
         sub_window, sub_window_target = self.get_sub_window((target_x, target_y))
         selected_area = CircularMask(self.selected_radius, sub_window.shape, sub_window_target)
@@ -196,4 +198,12 @@ class CircularWindow(Window):
             print("selected_area mask shape:", selected_area.mask.shape)
             print("background mask shape:", background.mask.shape)
             print("sub-image shape:", sub_image.shape)
-        return mask_image, sub_image
+
+        from matplotlib import colors
+        color_map = colors.ListedColormap(["white", "green", "red"])
+        norm = colors.BoundaryNorm([0, 1, 2, 3], color_map.N)
+        ax.imshow(sub_image, cmap="Greys")
+        ax.imshow(mask_image, alpha=0.3, cmap=color_map, norm=norm)
+        ax.set_title("Image window spot masks")
+
+        # return mask_image, sub_image
