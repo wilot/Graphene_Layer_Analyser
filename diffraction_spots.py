@@ -14,6 +14,8 @@ class SpotGroup:
         """Takes a list of spot coordinates in [[x, y], ...]"""
 
         self.spots = spots
+        self.colour = None
+        self.group_intensity = None
 
     def append(self, spot: np.ndarray):
         """Appends a spot or array of spots."""
@@ -25,38 +27,30 @@ class SpotGroup:
         # Otherwise, can append the list as is
         self.spots = np.append(self.spots, spot)
 
-    def get_median_circumcentre(self, permitted_radius) -> Union[np.ndarray, None]:
-        """Calculates the median circumcentre of this group."""
+
+    def get_circumcentres(self, permitted_radius) -> Union[np.ndarray, None]:
+        """Returns a list of all the circumcentres (before a median is taken). For debugging."""
 
         if len(self.spots) < 3:
-            # There aren't enough spots to determine a circumcentre!
-            return None
+            raise RuntimeError("Not enough spots to calculate circumcentres.")
 
         triplets = self._generate_triplet_combinations()
         circumcentres = np.array([self._get_circumcentre(triplet) for triplet in triplets])
         central_filter = lambda pos: not any(np.isnan(pos)) and np.linalg.norm(pos - (2048, 2048)) < permitted_radius
         circumcentres = [circ for circ in circumcentres if central_filter(circ)]
-        if len(circumcentres) == 0:
-            return None
-        median_circumcentre = np.median(circumcentres, axis=0)
 
-        return np.array(median_circumcentre)
+        if len(circumcentres) < 1:
+            raise RuntimeError("No valid circumcentres in SpotGroup.")
 
-    def get_circumcentres(self) -> Union[np.ndarray, None]:
-        """Returns a list of all the circumcentres (before a median is taken). For debugging."""
-        if len(self.spots) < 3:
-            return None
-        triplets = self._generate_triplet_combinations()
-        circumcentres = np.array([self._get_circumcentre(triplet) for triplet in triplets])
-        return circumcentres
+        return np.array(circumcentres)
 
-    def get_integrated_intensity(self, image_window: windows.Window) -> float:
+    def calculate_integrated_intensity(self, image_window: windows.Window) -> float:
         """Returns the summed, background corrected intensities of all spots in the group."""
 
         intensities = []
         for spot in self.spots:
             intensities.append(image_window.get_integrated_intensity(*spot))
-        return sum(intensities)
+        self.group_intensity = sum(intensities)
 
     def __len__(self):
         return len(self.spots)
@@ -140,16 +134,62 @@ def group_radially(centre_position, positions: np.ndarray, threshold, verbose=Fa
     return groups
 
 
-def group_azimuthally(centre_position, spot_groups: List[SpotGroup]) -> List[SpotGroup]:
-    """Groups spots azimuthally, once they have already been grouped radially."""
+def group_azimuthally(centre_position: List[float],
+                      spot_groups: Union[SpotGroup, List[SpotGroup]],
+                      threshold: float) -> List[SpotGroup]:
+    """Groups spots azimuthally, once they have already been grouped radially. Where the spots are greater than
+    "threshold" degrees away from 60° periodic the spot group will be further segmented.
 
-    # TODO: Implement
+    Works by using the centre position to determine the polar/azimuthal coordinate of each spot in each group. This
+    is then wrapped around 60°. The threshold is used to divide the 60° into segments identified by an index, and the
+    spots are grouped by which segment they fall into. Their wrapped angular position relative to a reference wrapped
+    spot (the median wrapped angle) is used to make it unlikely that the boundary of a segment falls within a valid
+    cluster.
 
+    Parameters
+    ----------
+    centre_position : The (x, y) coordinate of the centre about which polar coordinates are generated.
+    spot_groups : A list of spot groups, each of which will be further segmented.
+    threshold : The angular segmentation threshold (in degrees).
+    """
+
+    output_spot_groups = []
     for spot_group in spot_groups:
-        polar_angles = np.arctan(spot_group.spots[:, 1] / spot_group.spots[:, 0])  # arctan(Y / X)
-        # Graphene's diffraction pattern shows 6-fold radial symmetry (periodic every 60°)
-        polar_angles = polar_angles % 60
-        print(polar_angles)
-        print(np.mean(polar_angles), np.std(polar_angles))
 
-    raise NotImplementedError
+        if len(spot_group) < 2:
+            output_spot_groups.append(spot_group)
+            continue
+
+        y_coordinates = spot_group.spots[:, 1] - centre_position[1]
+        x_coordinates = spot_group.spots[:, 0] - centre_position[0]
+        polar_angles = np.rad2deg(np.arctan(y_coordinates / x_coordinates))  # arctan(Y / X)
+
+        # Graphene's diffraction pattern shows 6-fold radial symmetry (periodic every 60°)
+        wrapped_polar_angles = polar_angles % 60
+        # Compute the deviations from perfect 6-fold symmetry, wrapping around 60°
+        wrapped_angle_distance = lambda a, b: min(abs(b - a), abs(abs(b - a) - 60.))
+        reference_angle = np.median(wrapped_polar_angles)
+        angle_differences = [wrapped_angle_distance(reference_angle, b) for b in wrapped_polar_angles]
+
+        # Segment
+        segmented_group = {}
+        for index, diff in enumerate(angle_differences):
+            segmented_group_key = int(diff // threshold)
+            if segmented_group_key not in segmented_group.keys():
+                segmented_group[segmented_group_key] = [spot_group.spots[index], ]
+            else:
+                segmented_group[segmented_group_key].append(spot_group.spots[index])
+        for key, spot_positions in segmented_group.items():
+            spot_positions = np.array(spot_positions)
+            new_spot_group = SpotGroup(spot_positions)
+            output_spot_groups.append(new_spot_group)
+
+    return output_spot_groups
+
+
+def prune_spot_groups(spot_groups: List[SpotGroup], min_spots = 4):
+    """Removes spot groups containing fewer than min_spots."""
+
+    keep_group = lambda spot_group: len(spot_group) >= min_spots
+    pruned_spot_groups_iterator = filter(keep_group, spot_groups)
+    return list(pruned_spot_groups_iterator)
