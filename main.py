@@ -17,7 +17,6 @@ import methods
 import user_interface as ui
 
 
-# TODO: Properly implement
 # ui.get_cli_arguments()
 
 # For debugging only, to be superseded by get_cli_arguments(). Modify with your own path to data while developing.

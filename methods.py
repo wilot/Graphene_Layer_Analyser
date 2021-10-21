@@ -1,13 +1,9 @@
 """Utility methods."""
 
-from typing import List
-
 import numpy as np
 import scipy.optimize
 import scipy.ndimage
 import matplotlib.pyplot as plt
-
-from hyperspy.api import signals as hs_signals
 
 
 def centre_of_mass(image: np.ndarray, lower_threshold_abs, show=False):
