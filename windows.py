@@ -14,7 +14,7 @@ Note: Currently, pixel smoothing of mask boundaries is ignored, so mask edges wi
 
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Tuple, Any, Union
+from typing import Tuple, Any, Union, List
 
 import matplotlib.axes
 import numpy as np
@@ -68,10 +68,10 @@ class Mask(ABC):
     def __init__(self, sub_window_shape: Tuple, centre: Tuple[float, float]):
         self.sub_window_shape = sub_window_shape
         self.centre = centre
-        self.mask = self.generate_mask()
+        self.mask, self.num_px = self.generate_mask()
 
     @abstractmethod
-    def generate_mask(self) -> np.ndarray: raise NotImplementedError
+    def generate_mask(self) -> Tuple[np.ndarray, np.int64]: raise NotImplementedError
 
     @staticmethod
     @lru_cache(maxsize=1)
@@ -93,6 +93,13 @@ class Mask(ABC):
         masked_max = np.max(background_subtracted_window[self.mask])
         return float(masked_max)
 
+    def get_rms_error(self, sub_window, target_value):
+        """Computes the the RMS deviation of pixels in the sub-window away from the target value over the
+        mask. """
+        deviations = sub_window[self.mask] - target_value
+        rms = np.sqrt(np.mean(deviations ** 2))  # The RMS deviation
+        return rms
+
     def __del__(self):
         del self.mask
 
@@ -106,7 +113,7 @@ class CircularMask(Mask):
         self.radius = radius
         super(CircularMask, self).__init__(sub_window_shape, centre)
 
-    def generate_mask(self) -> np.ndarray:
+    def generate_mask(self) -> Tuple[np.ndarray, np.int64]:
         # Caching saves a bit of time, I hope...
         xx, yy = super(CircularMask, self).cached_mesh_grid(self.sub_window_shape).copy()
         xx -= self.centre[0]
@@ -114,7 +121,7 @@ class CircularMask(Mask):
         xx_squared = xx ** 2
         yy_squared = yy ** 2
         mask = (xx_squared + yy_squared) < self.radius ** 2
-        return mask
+        return mask, mask.sum()
 
 
 class AnnularMask(Mask):
@@ -129,10 +136,11 @@ class AnnularMask(Mask):
         self.centre = centre
         super(AnnularMask, self).__init__(sub_window_shape, centre)
 
-    def generate_mask(self) -> np.ndarray:
+    def generate_mask(self) -> Tuple[np.ndarray, np.int64]:
         inner_mask = CircularMask(self.inner_radius, self.sub_window_shape, self.centre)
         outer_mask = CircularMask(self.outer_radius, self.sub_window_shape, self.centre)
-        return np.logical_xor(outer_mask.mask, inner_mask.mask)
+        mask = np.logical_xor(outer_mask.mask, inner_mask.mask)
+        return mask, mask.sum()
 
 
 class CircularWindow(Window):
@@ -153,27 +161,34 @@ class CircularWindow(Window):
         sub_window_radial_extent_x = sub_window_radial_extent_y = int(background_outer_radius * 1.1)
         super(CircularWindow, self).__init__(sub_window_radial_extent_x, sub_window_radial_extent_y, parent_image)
 
-    def get_intensity(self, target_x: float, target_y: float, method: str = "None") -> float:
-        """Determines the intensity from the pre-configured CircularWindow, at the provided target coordinates."""
+    def get_intensity(self, target_x: float, target_y: float, method: str = "None") -> Tuple[float, Union[float, None]]:
+        """Determines the intensity (and its uncertainty) from the pre-configured CircularWindow,
+        at the provided target coordinates. Note, standard deviation is only implemented for the sum method so far...
+        """
 
         sub_image, selected_area, background = self._generate_masks((target_x, target_y))
         background_average = background.get_mean(sub_image)
+        background_error = background.get_rms_error(sub_image, background_average)  # Background RMS deviation
+
         if method == "integrated" or "None":
-            return selected_area.get_sum(sub_image, background_value=background_average)
+            sa_sum = selected_area.get_sum(sub_image, background_value=background_average)
+            sa_error = background_error * selected_area.num_px
+            uncertainty = sa_error
+            return sa_sum, uncertainty
         elif method == "average":
-            return selected_area.get_mean(sub_image, background_value=background_average)
+            return selected_area.get_mean(sub_image, background_value=background_average), None
         elif method == "maximum":
-            return selected_area.get_max(sub_image, background_value=background_average)
+            return selected_area.get_max(sub_image, background_value=background_average), None
         else:
             raise ValueError("The 'method' passed to CircularWindow.get_intensity() was not recognised.")
 
-    def get_integrated_intensity(self, target_x: float, target_y: float) -> float:
+    def get_integrated_intensity(self, target_x: float, target_y: float) -> Tuple[float, Union[float, None]]:
         return self.get_intensity(target_x, target_y, "integrated")
 
-    def get_average_intensity(self, target_x: float, target_y: float) -> float:
+    def get_average_intensity(self, target_x: float, target_y: float) -> Tuple[float, Union[float, None]]:
         return self.get_intensity(target_x, target_y, "average")
 
-    def get_maximum_intensity(self, target_x: float, target_y: float) -> float:
+    def get_maximum_intensity(self, target_x: float, target_y: float) -> Tuple[float, Union[float, None]]:
         return self.get_intensity(target_x, target_y, "maximum")
 
     def _generate_masks(self, target: Tuple[float, float]) -> Tuple[np.ndarray, CircularMask, AnnularMask]:

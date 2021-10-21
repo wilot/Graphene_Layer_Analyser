@@ -2,6 +2,7 @@
 
 Contains methods associated with handling the user interfaces."""
 
+import os.path
 import argparse
 from typing import List
 
@@ -45,7 +46,11 @@ def plot_group_intensities(spot_groups: List[SpotGroup]):
     width = 0.35
     group_positions = [i + width / 2 for i in range(len(spot_groups))]
     group_intensities = [group.group_intensity for group in spot_groups]
-    ax.bar(group_positions, group_intensities, color=group_colours)
+    group_uncertanties = [group.group_uncertainty for group in spot_groups]
+    group_uncertanties = [uncert if uncert is not None else 0 for uncert in group_uncertanties]
+    print("Raw uncertainties:", group_uncertanties)
+    print("Relative uncertainties:", [str((uncert / intens)*100)+'%' for uncert, intens in zip(group_uncertanties, group_intensities)])
+    ax.bar(group_positions, group_intensities, yerr=group_uncertanties, color=group_colours, alpha=0.5)
     ax.set_ylabel("Summed Counts")
     ax.set_xticks(group_positions)
     ax.set_xticklabels(group_labels)
@@ -54,8 +59,6 @@ def plot_group_intensities(spot_groups: List[SpotGroup]):
 
 def get_cli_arguments() -> List[str]:
     """Handles the reading of command line arguments."""
-
-    import argparse
 
     description = "A program to process a stack of diffraction patterns of Graphene and attempt to automatically " \
                   "determine if the sample is a monolayer or a few layers."
@@ -67,14 +70,22 @@ def get_cli_arguments() -> List[str]:
     args = parser.parse_args()
 
     fetched_filenames = args.filename
-    print(f"The filename arguments are:\t{fetched_filenames=}")
+    # print(f"The filename arguments are:\t{fetched_filenames=}")
 
-    # TODO: Perform filename validation
+    valid_filenames = validate_filenames(fetched_filenames)
 
     if len(fetched_filenames) > 1:
         raise NotImplementedError("Multiple file processing is not implemented yet!")
 
     return fetched_filenames
+
+
+def validate_filenames(filenames: List[str]):
+    """Checks filenames for their files' existence, removing invalid filenames."""
+
+    is_valid_filename = lambda filename: os.path.isfile(filename)
+    return filter(is_valid_filename, filenames)
+
 
 
 def load_filenames():

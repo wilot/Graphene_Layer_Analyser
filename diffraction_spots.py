@@ -16,6 +16,7 @@ class SpotGroup:
         self.spots = spots
         self.colour = None
         self.group_intensity = None
+        self.group_uncertainty = None
 
     def append(self, spot: np.ndarray):
         """Appends a spot or array of spots."""
@@ -26,7 +27,6 @@ class SpotGroup:
             return
         # Otherwise, can append the list as is
         self.spots = np.append(self.spots, spot)
-
 
     def get_circumcentres(self, permitted_radius) -> Union[np.ndarray, None]:
         """Returns a list of all the circumcentres (before a median is taken). For debugging."""
@@ -44,13 +44,22 @@ class SpotGroup:
 
         return np.array(circumcentres)
 
-    def calculate_integrated_intensity(self, image_window: windows.Window) -> float:
+    def calculate_integrated_intensity(self, image_window: windows.Window):
         """Returns the summed, background corrected intensities of all spots in the group."""
 
         intensities = []
+        uncertanties = []
         for spot in self.spots:
-            intensities.append(image_window.get_integrated_intensity(*spot))
+            intensity, uncertainty = image_window.get_integrated_intensity(*spot)
+            intensities.append(intensity)
+            if uncertainty is not None:
+                uncertanties.append(uncertainty)
+
         self.group_intensity = sum(intensities)
+        if len(uncertanties) == 0:
+            return
+        uncertainty = sum(uncertanties)
+        self.group_uncertainty = uncertainty
 
     def __len__(self):
         return len(self.spots)
@@ -187,7 +196,7 @@ def group_azimuthally(centre_position: List[float],
     return output_spot_groups
 
 
-def prune_spot_groups(spot_groups: List[SpotGroup], min_spots = 4):
+def prune_spot_groups(spot_groups: List[SpotGroup], min_spots=4):
     """Removes spot groups containing fewer than min_spots."""
 
     keep_group = lambda spot_group: len(spot_group) >= min_spots

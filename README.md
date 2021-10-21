@@ -18,7 +18,7 @@ Next the peaks are segmented. Initially they are segmented according to a radial
 
 It is not yet known how necessary repeated re-estimation of the central-spot and repeated radial segmentation is. On a few images I have found it to be helpful, however these might be unrepresentitve. I have yet to try on the dataset I currently have with noise added in.
 
-After grouping radially, the spots must be segmented azimuthally, to separate different twists if there is a twisted sample. This could immediately be identified as few-layer. **Azimuthal grouping has not yet been implemented.**
+After grouping radially, the spots must be segmented azimuthally, to separate different twists if there is a twisted sample.
 
 Many of the processes involved in peak segmentation and grouping are stored in the `diffraction_spots.py` module. A class for groups of spots, `SpotGroup` and methods for segmentation are stored here.
 
@@ -32,16 +32,17 @@ For each image a `Window` object is defined. This defines a number of things tha
 
 This portion of the code works fairly well, so I don't plan on altering it or optimising it at least until the segmentation problems are ironed out.
 
+### Error Propagation
+The errors for each spot are determined by firstly estimating the pixel-error from the background pixels. The mean of the background annulus is taken, then the RMS deviation from the background-mean of all the background pixels is used. This is then multiplied by the number of pixels used in the selected-area and the result is taken to be the uncertainty in the intensity of that spot (see `windows.CircularWindow.get_intensity()`. The uncertainty of a SpotGroup is then taken to be the sum or the uncertainties of all the spots within that SpotGroup (see `diffraction_spots.SpotGroup.calculate_integrated_intensity()`). 
+
+Using this error-propogation approach, of the diffraction-patterns tested, the uncertainties appear to mostly be between 0.5% and 5%.
+
 ### Layer Determination
 
 With the intensities of all the spots in the segmented groups of spots, it becomes easy to differentiate monolayer and few-layer Graphene samples. There either is or is not a factor of two difference in the intensity of the inner hexagon's spots compared to the next outer hexagon. This is currently implemented in the `methods.py` module.
 
 ## Improvements
 
-Firstly and most importantly, the radial segmentation must be improved and an azimuthal segmentation procedure implemented. 
-
 Next, the way the results are showed needs work. Currently, debugging graphs and print statements are the only semblance of a UI. A CLI would probably be acceptable, but it really ought to be able to generate a figure for each diffraction-pattern so that the user can choose to accept or reject the thickness estimation based on the location of the identified peaks. 
 
-A CLI interface should be ironed out. As simple as possible preferably. All the code in `main.py` and `methods.py` could use tidying too.
-
-Finally, the entire thing should be packaged...
+Finally, the entire thing should be packaged.
