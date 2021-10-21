@@ -172,7 +172,7 @@ class CircularWindow(Window):
 
         if method == "integrated" or "None":
             sa_sum = selected_area.get_sum(sub_image, background_value=background_average)
-            sa_error = background_error * selected_area.num_px
+            sa_error = np.sqrt(background_error**2 * selected_area.num_px)
             uncertainty = sa_error
             return sa_sum, uncertainty
         elif method == "average":

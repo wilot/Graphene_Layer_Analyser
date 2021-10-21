@@ -58,7 +58,8 @@ class SpotGroup:
         self.group_intensity = sum(intensities)
         if len(uncertanties) == 0:
             return
-        uncertainty = sum(uncertanties)
+        uncertanties = np.array(uncertanties)
+        uncertainty = np.sqrt(np.sum(uncertanties**2))
         self.group_uncertainty = uncertainty
 
     def __len__(self):
