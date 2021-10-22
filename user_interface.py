@@ -9,6 +9,21 @@ from typing import List
 import matplotlib.pyplot as plt
 
 from diffraction_spots import SpotGroup
+from pattern_processor import ProcessedResult
+
+
+def plot(process_result: ProcessedResult) -> plt.Figure:
+    """Plots a figure showing the results of the analysis, returning the figure."""
+
+    assign_spot_group_colours(process_result.spot_groups)
+    fig, (segmentation_axis, intensities_axis) = plt.subplots(nrows=1, ncols=2, dpi=280, figsize=(11, 4.75))
+    plot_segmented_image(segmentation_axis, process_result.spot_groups, process_result.central_spot_coordinate,
+                         process_result.outer_background_radius, process_result.diffraction_pattern)
+    plot_group_intensities(intensities_axis, process_result.spot_groups)
+    # TODO: Change this when sorting out a proper UI...
+    # fig.show()
+    plt.show()
+    return fig
 
 
 def assign_spot_group_colours(spot_groups: List[SpotGroup]):
@@ -18,27 +33,21 @@ def assign_spot_group_colours(spot_groups: List[SpotGroup]):
         spot_group.colour = group_colors[colour_index]
 
 
-def plot_segmented_image(peak_groups, centre, outer_background_radius,
-                         signal, error=False):
-    """Plots the hyperspy signal with circles showing the outer-background radii."""
+def plot_segmented_image(ax: plt.Axes, peak_groups, centre, circle_radius, signal):
+    """Plots the Hyperspy signal with circles showing the outer-background radii."""
 
-    fig, ax = plt.subplots()
     ax.imshow(signal.data, vmin=0, vmax=200)
     for group_number, group in enumerate(peak_groups):
         for peak_point in group.spots:
-            circle = plt.Circle(peak_point[::-1], outer_background_radius, color=group.colour, fill=False)
+            circle = plt.Circle(peak_point[::-1], circle_radius, color=group.colour, fill=False)
             ax.add_patch(circle)
-    central_spot_patch = plt.Circle(centre[::-1], outer_background_radius / 2, color='w', fill=True)
+    central_spot_patch = plt.Circle(centre[::-1], circle_radius / 2, color='w', fill=True)
     ax.add_patch(central_spot_patch)
-    if error:
-        ax.set_title("Error!")
-    plt.show()
 
 
-def plot_group_intensities(spot_groups: List[SpotGroup]):
+def plot_group_intensities(ax: plt.Axes, spot_groups: List[SpotGroup]):
     """Plots a bar chart of the integrated intensities of the respective groups."""
 
-    fig, ax = plt.subplots()
     group_color_labels = {'r': "Red", 'g': "Green", 'b': "Blue", 'c': "Cyan", 'm': "Magenta", 'y': "Yellow",
                           'w': "White"}
     group_colours = [group.colour for group in spot_groups]
@@ -49,12 +58,12 @@ def plot_group_intensities(spot_groups: List[SpotGroup]):
     group_uncertanties = [group.group_uncertainty for group in spot_groups]
     group_uncertanties = [uncert if uncert is not None else 0 for uncert in group_uncertanties]
     print("Raw uncertainties:", group_uncertanties)
-    print("Relative uncertainties:", [str((uncert / intens)*100)+'%' for uncert, intens in zip(group_uncertanties, group_intensities)])
+    print("Relative uncertainties:",
+          [str((uncert / intens) * 100) + '%' for uncert, intens in zip(group_uncertanties, group_intensities)])
     ax.bar(group_positions, group_intensities, yerr=group_uncertanties, color=group_colours, alpha=0.5)
     ax.set_ylabel("Summed Counts")
     ax.set_xticks(group_positions)
     ax.set_xticklabels(group_labels)
-    plt.show()
 
 
 def get_cli_arguments() -> List[str]:
@@ -85,7 +94,6 @@ def validate_filenames(filenames: List[str]):
 
     is_valid_filename = lambda filename: os.path.isfile(filename)
     return filter(is_valid_filename, filenames)
-
 
 
 def load_filenames():
