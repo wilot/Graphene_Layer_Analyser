@@ -4,6 +4,16 @@
 
 This project aims to analyse electron-microscope diffraction patterns of graphene, with the aim of being able to differentiate between monolayer and bilayer/few-layer samples. Current diffraction pattern analysis tools require significant human interaction, and are therefore time-consuming, particularly for large datasets. The necessity for human interaction also reduces reproducibility. By developing an algorithmic-based analysis tool, it is hoped that the field of graphene metrology will be improved, because layer-analysis of samples will become more approachable.
 
+This aims to be a convenient tool to implement a new metrology technique for measuring the layered-ness of graphene. The standard is implemented by performing aperture photometry on the diffraction spots, summing the spots and commparing first and second diffraction-spot 'rings'. The code implementing this is found in `windows.py`. The remainder of the code, including automatic segmentation/grouping, plotting/graphing, automatic spot-finding etc. is for convenience.
+
+## Using the program
+
+To use the program, after installing necessary libraries and setting up your environment, type
+
+`python main.py filename -s`
+
+where filename is the name of the filename to be processed. The program can also analyse batches of filenames, specified as a list in the command line or, more conveniently, using wildcards in the terminal. The program requires an empty folder/directory to save files into. The flag `-s` commands the program to display the figure as well as save, and ought only be used when processing single files. By default, the program searches for `output` however this can be specified with `--output`. Currently parallelisation is not yet implemented. Help text can be accessed by typing `python main.py --help`.
+
 ## Manifest
 
 Here an overview of the locations of important datastructures can be found. This list is organised in the order that a new user might want to look through the source code, should they want to familiarise themselves with this program's workings.
