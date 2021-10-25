@@ -1,23 +1,20 @@
-"""Test module
+"""Controller module
 
-This module will primarily be used for ironing out the analytical techniques. Not to be used by users.
-"""
-
-import hyperspy.api as hs
+This module links the user interface and processing parts of the program. Parallelized processing and such should be
+dealt with here. """
 
 import user_interface as ui
 import pattern_processor
 
 
-# ui.get_cli_arguments()
+filenames, output_dir, show, parallelize = ui.get_cli_arguments()
 
-# For debugging only, to be superseded by get_cli_arguments(). Modify with your own path to data while developing.
-image_filenames = ui.load_filenames()
-filename = image_filenames[0]["dataset_file_list"][15]
-s = hs.load(filename)
-print("Image loaded")
+if parallelize:
+    print("Parallelization not implemented yet, continuing serially.")
 
-process_result = pattern_processor.process(s)
-ui.plot(process_result)
+for filename, signal in zip(filenames, ui.load_signals(filenames)):
+    process_result = pattern_processor.process(signal)
+    figure = ui.plot(filename, process_result, show)
+    ui.save_figure(figure, output_dir, filename)
 
 print("Success!")

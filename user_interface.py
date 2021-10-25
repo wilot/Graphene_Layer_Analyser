@@ -2,29 +2,111 @@
 
 Contains methods associated with handling the user interfaces."""
 
-import os.path
+import os
 import argparse
-from typing import List
+import sys
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
+import hyperspy.api as hs
 
 from diffraction_spots import SpotGroup
 from pattern_processor import ProcessedResult
 
 
-def plot(process_result: ProcessedResult) -> plt.Figure:
+################
+# Main methods #
+################
+
+def plot(filename: str, process_result: ProcessedResult, show_fig=False) -> plt.Figure:
     """Plots a figure showing the results of the analysis, returning the figure."""
 
+    display_filename = filename.split("/")[-1]
+
     assign_spot_group_colours(process_result.spot_groups)
-    fig, (segmentation_axis, intensities_axis) = plt.subplots(nrows=1, ncols=2, dpi=280, figsize=(11, 4.75))
+
+    fig, (segmentation_axis, intensities_axis) = plt.subplots(nrows=1, ncols=2, dpi=280, figsize=(10, 4.75))
     plot_segmented_image(segmentation_axis, process_result.spot_groups, process_result.central_spot_coordinate,
                          process_result.outer_background_radius, process_result.diffraction_pattern)
     plot_group_intensities(intensities_axis, process_result.spot_groups)
-    # TODO: Change this when sorting out a proper UI...
-    # fig.show()
-    plt.show()
+    fig.suptitle(display_filename)
+
+    if show_fig:
+        plt.show()
+
     return fig
 
+
+def load_signals(filenames: List[str]):
+    """Generator that takes a list of filenames and yields their loaded Hyperspy Signal2D objects."""
+
+    for filename in filenames:
+        try:
+            signal = hs.load(filename)
+        except Exception as error:
+            print(f"There was a error processing {filename}.")
+            print(error)
+            continue
+        yield signal
+
+
+def save_figure(figure: plt.Figure, output_dir: str, source_filename: str):
+    """Saves the figure."""
+
+    _, source_filename = os.path.split(source_filename)
+    save_filename = source_filename.split(".")[:-1]  # Strip filetype
+    save_filename.append(".png")
+    save_filename = ''.join(save_filename)
+    output_filename = os.path.join(output_dir, save_filename)
+    figure.savefig(output_filename)
+
+
+##########################
+# Command line interface #
+##########################
+
+def get_cli_arguments() -> Tuple[List[str], str, bool, bool]:
+    """Handles the reading of command line arguments. Returns a list of the filenames to be processed, the output
+    directory and whether the figures should be shown or saved."""
+
+    description = "A program to process a stack of diffraction patterns of Graphene and attempt to automatically " \
+                  "determine if the sample is a monolayer or a few layers."
+    filename_help_text = "A filename or list of filenames to be processed."
+    output_help_text = "Directory where output files should be stored. This must already exist at the location " \
+                       "specified and be empty. Default is 'output/'."
+    show_help_text = "Display figures rather than save them."
+    parallel_help_text = "Parallelise the processing of files. Note, cannot be used with '--show'."
+
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("--filename", "-f", type=str, nargs="+", help=filename_help_text)
+    parser.add_argument("--output", type=str, default="output", help=output_help_text)
+    parser.add_argument("--show", "-s", action="store_true", help=show_help_text)
+    parser.add_argument("--parallelize", "-p", action="store_true", help=parallel_help_text)
+
+    args = parser.parse_args()
+
+    if args.filename is None:
+        # Start GUI
+        raise NotImplementedError
+
+    validate_filenames(args.filename)
+    validate_output_directory(args.output)
+    if args.show and args.parallelize:
+        print("Cannot both parallelise and show.")
+        sys.exit(1)
+
+    return args.filename, args.output, args.show, args.parallelize
+
+
+############################
+# Graphical user interface #
+############################
+
+# TODO: GUI
+
+####################
+# Plotting methods #
+####################
 
 def assign_spot_group_colours(spot_groups: List[SpotGroup]):
     group_colors = 'r', 'g', 'b', 'c', 'm', 'y', 'w'
@@ -43,6 +125,8 @@ def plot_segmented_image(ax: plt.Axes, peak_groups, centre, circle_radius, signa
             ax.add_patch(circle)
     central_spot_patch = plt.Circle(centre[::-1], circle_radius / 2, color='w', fill=True)
     ax.add_patch(central_spot_patch)
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
 
 
 def plot_group_intensities(ax: plt.Axes, spot_groups: List[SpotGroup]):
@@ -52,68 +136,55 @@ def plot_group_intensities(ax: plt.Axes, spot_groups: List[SpotGroup]):
                           'w': "White"}
     group_colours = [group.colour for group in spot_groups]
     group_labels = [group_color_labels[group.colour] + ' ' + "group" for group in spot_groups]
-    width = 0.35
-    group_positions = [i + width / 2 for i in range(len(spot_groups))]
+
+    bar_width = 0.35
+    group_positions = [i + bar_width / 2 for i in range(len(spot_groups))]
+
     group_intensities = [group.group_intensity for group in spot_groups]
+    group_intensities = [group_intensity / 1e3 for group_intensity in group_intensities]  # Plot kilo-counts
     group_uncertanties = [group.group_uncertainty for group in spot_groups]
-    group_uncertanties = [uncert if uncert is not None else 0 for uncert in group_uncertanties]
-    print("Raw uncertainties:", group_uncertanties)
-    print("Relative uncertainties:",
-          [str((uncert / intens) * 100) + '%' for uncert, intens in zip(group_uncertanties, group_intensities)])
-    ax.bar(group_positions, group_intensities, yerr=group_uncertanties, color=group_colours, alpha=0.5)
-    ax.set_ylabel("Summed Counts")
+    group_uncertanties = [uncert / 1e3 if uncert is not None else 0. for uncert in group_uncertanties]  # Strip Nones
+    group_uncertanties_text = ["{:.2%}".format(uncertainty / intensity) for uncertainty, intensity in
+                               zip(group_uncertanties, group_intensities)]  # Pretty string format
+    # Plot as kilo counts instead
+    text_y_offset = max(group_intensities) * 0.02  # Height above the bar to add the text displaying uncertainty
+
+    ax.yaxis.set_major_formatter("{x:.0f}")
+    ax.set_ylabel("Summed Counts / 1E3")
+    ax.yaxis.set_label_position("right")
+    ax.yaxis.tick_right()
+
     ax.set_xticks(group_positions)
     ax.set_xticklabels(group_labels)
 
+    for x_pos, intensity, text in zip(group_positions, group_intensities, group_uncertanties_text):
+        y_pos = intensity + text_y_offset
+        ax.text(x_pos, y_pos, text, fontsize="small")
 
-def get_cli_arguments() -> List[str]:
-    """Handles the reading of command line arguments."""
+    ax.bar(group_positions, group_intensities, yerr=group_uncertanties, color=group_colours, alpha=0.5)
 
-    description = "A program to process a stack of diffraction patterns of Graphene and attempt to automatically " \
-                  "determine if the sample is a monolayer or a few layers."
-    filename_help_text = "A filename or list of filenames to be processed."
 
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("filename", type=str, nargs="+", help=filename_help_text)
-
-    args = parser.parse_args()
-
-    fetched_filenames = args.filename
-    # print(f"The filename arguments are:\t{fetched_filenames=}")
-
-    valid_filenames = validate_filenames(fetched_filenames)
-
-    if len(fetched_filenames) > 1:
-        raise NotImplementedError("Multiple file processing is not implemented yet!")
-
-    return fetched_filenames
-
+##############
+# Validation #
+##############
 
 def validate_filenames(filenames: List[str]):
-    """Checks filenames for their files' existence, removing invalid filenames."""
+    """Checks filenames for their files' existence, removing invalid filenames. Returns True if filenames are valid,
+    and a list of the invalid filenames otherwise. """
 
-    is_valid_filename = lambda filename: os.path.isfile(filename)
-    return filter(is_valid_filename, filenames)
+    invalid_filename = lambda filename: not os.path.isfile(filename)
+    invalid_filenames_list = list(filter(invalid_filename, filenames))
+    if len(invalid_filenames_list) == 0:
+        return
+    print("The following filenames were not recognized.")
+    print("\n".join(invalid_filenames_list))
+    sys.exit(1)
 
 
-def load_filenames():
-    """Hardcoded loading of filenames on my pc. For DEBUGGING ONLY!!!"""
+def validate_output_directory(directory: str):
+    """Validates an output directory. Directory must exist and be empty"""
 
-    import os
-
-    data_directory = "data"
-    data_filenames = []
-
-    # Make a list of filenames
-    for dataset_directory in os.listdir(data_directory):
-        dataset_directory_path = os.path.join(data_directory, dataset_directory)
-        data_filenames.append({
-            "dataset_name": dataset_directory,
-            "dataset_file_list": [
-                os.path.join(dataset_directory_path, filename)
-                for filename in os.listdir(dataset_directory_path)
-                if filename[-4:] == ".dm3" or filename[-4:] == ".emd"
-            ]
-        })
-
-    return data_filenames
+    if os.path.isdir(directory) and len(os.listdir(directory)) == 0:
+        return
+    print(f"The output directory '{directory}' was not found or was not empty.")
+    sys.exit(1)
