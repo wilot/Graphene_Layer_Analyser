@@ -49,6 +49,7 @@ For each image a `Window` object is defined. This defines a number of things tha
 This portion of the code works fairly well, so I don't plan on altering it or optimising it at least until the segmentation problems are ironed out.
 
 ### Error Propagation
+
 The errors for each spot are determined by firstly estimating the pixel-error from the background pixels. The mean of the background annulus is taken, then the RMS deviation from the background-mean of all the background pixels is used. This is then squared, multiplied by the number of pixels used in the selected-area, and then square-rooted (a sum-in-quadrature). This result is taken to be the uncertainty in the intensity of that spot (see `windows.CircularWindow.get_intensity()`. The uncertainty of a SpotGroup is then taken to be the sum-in-quadrature of the uncertainties of all the spots within that SpotGroup (see `diffraction_spots.SpotGroup.calculate_integrated_intensity()`). 
 
 Using this error-propogation approach, of the diffraction-patterns tested, the uncertainties appear to mostly be between 0.1% and 5%.
@@ -56,16 +57,14 @@ Using this error-propogation approach, of the diffraction-patterns tested, the u
 ## Examples
 
 ### Successes
-<img src="examples/1_SAED.png" width="30%">
-<img src="examples/5_SAED.png" width="30%">
-<img src="examples/Camera%20Ceta%201359%20410%20mm___Raw.png" width="30%">
-![](examples/1_SAED.png){:width="30%"}
-![](examples/5_SAED.png){:width="30%}
-![](examples/Camera%20Ceta%201359%20410%20mm___Raw.png){:width="30%"}
+
+![](examples/1_SAED.png)
+![](examples/5_SAED.png)
+![](examples/Camera%20Ceta%201359%20410%20mm___Raw.png)
 
 ### Failures
-<img src="examples/13_SAED.png" width="30%">
-![](examples/13_SAED.png){width="30%"}
+
+![](examples/13_SAED.png)
 
 
 ## Next Steps
