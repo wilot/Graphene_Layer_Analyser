@@ -22,6 +22,8 @@ def plot(filename: str, process_result: ProcessedResult, show_fig=False) -> plt.
     """Plots a figure showing the results of the analysis, returning the figure."""
 
     display_filename = filename.split("/")[-1]
+    if not process_result.is_success():
+        display_filename += " ERROR"
 
     assign_spot_group_colours(process_result.spot_groups)
 
@@ -48,6 +50,7 @@ def load_signals(filenames: List[str]):
             print(error)
             continue
         yield signal
+        print(f"Processing of {filename} complete.")
 
 
 def save_figure(figure: plt.Figure, output_dir: str, source_filename: str):
@@ -59,6 +62,7 @@ def save_figure(figure: plt.Figure, output_dir: str, source_filename: str):
     save_filename = ''.join(save_filename)
     output_filename = os.path.join(output_dir, save_filename)
     figure.savefig(output_filename)
+    plt.close(figure)  # Clear up memory
 
 
 ##########################
@@ -87,7 +91,7 @@ def get_cli_arguments() -> Tuple[List[str], str, bool, bool]:
 
     if args.filename is None:
         # Start GUI
-        raise NotImplementedError
+        raise NotImplementedError("GUI not yet implemented.")
 
     validate_filenames(args.filename)
     validate_output_directory(args.output)
@@ -132,18 +136,22 @@ def plot_segmented_image(ax: plt.Axes, peak_groups, centre, circle_radius, signa
 def plot_group_intensities(ax: plt.Axes, spot_groups: List[SpotGroup]):
     """Plots a bar chart of the integrated intensities of the respective groups."""
 
+    if len(spot_groups) == 0:
+        return
+
     group_color_labels = {'r': "Red", 'g': "Green", 'b': "Blue", 'c': "Cyan", 'm': "Magenta", 'y': "Yellow",
                           'w': "White"}
     group_colours = [group.colour for group in spot_groups]
-    group_labels = [group_color_labels[group.colour] + ' ' + "group" for group in spot_groups]
+    group_labels = list(map(lambda group: group_color_labels[group.colour], spot_groups))
+    if len(spot_groups) < 5:  # If there's sufficient room in the figure
+        group_labels = [label + ' ' + "group" for label in group_labels]
 
     bar_width = 0.35
     group_positions = [i + bar_width / 2 for i in range(len(spot_groups))]
 
     group_intensities = [group.group_intensity for group in spot_groups]
     group_intensities = [group_intensity / 1e3 for group_intensity in group_intensities]  # Plot kilo-counts
-    group_uncertanties = [group.group_uncertainty for group in spot_groups]
-    group_uncertanties = [uncert / 1e3 if uncert is not None else 0. for uncert in group_uncertanties]  # Strip Nones
+    group_uncertanties = [group.group_uncertainty / 1e3 for group in spot_groups]
     group_uncertanties_text = ["{:.2%}".format(uncertainty / intensity) for uncertainty, intensity in
                                zip(group_uncertanties, group_intensities)]  # Pretty string format
     # Plot as kilo counts instead
@@ -161,7 +169,7 @@ def plot_group_intensities(ax: plt.Axes, spot_groups: List[SpotGroup]):
         y_pos = intensity + text_y_offset
         ax.text(x_pos, y_pos, text, fontsize="small")
 
-    ax.bar(group_positions, group_intensities, yerr=group_uncertanties, color=group_colours, alpha=0.5)
+    ax.bar(group_positions, group_intensities, yerr=group_uncertanties, color=group_colours, alpha=0.75, edgecolor='k')
 
 
 ##############

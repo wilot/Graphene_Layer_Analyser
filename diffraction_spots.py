@@ -15,8 +15,8 @@ class SpotGroup:
 
         self.spots = spots
         self.colour = None
-        self.group_intensity = None
-        self.group_uncertainty = None
+        self.group_intensity = 0
+        self.group_uncertainty = 0
 
     def append(self, spot: np.ndarray):
         """Appends a spot or array of spots."""
@@ -55,11 +55,12 @@ class SpotGroup:
             if uncertainty is not None:
                 uncertanties.append(uncertainty)
 
-        self.group_intensity = sum(intensities)
+        self.group_intensity = sum(intensities) / len(self)
         if len(uncertanties) == 0:
             return
         uncertanties = np.array(uncertanties)
         uncertainty = np.sqrt(np.sum(uncertanties**2))
+        uncertainty /= len(self)
         self.group_uncertainty = uncertainty
 
     def __len__(self):
@@ -177,9 +178,10 @@ def group_azimuthally(centre_position: List[float],
         # Graphene's diffraction pattern shows 6-fold radial symmetry (periodic every 60°)
         wrapped_polar_angles = polar_angles % 60
         # Compute the deviations from perfect 6-fold symmetry, wrapping around 60°
-        wrapped_angle_distance = lambda a, b: min(abs(b - a), abs(abs(b - a) - 60.))
-        reference_angle = np.median(wrapped_polar_angles)
-        angle_differences = [wrapped_angle_distance(reference_angle, b) for b in wrapped_polar_angles]
+        # wrapped_angle_distance = lambda a, b: min(abs(b - a), abs(abs(b - a) - 60.))
+        angle_distance = lambda a, b: b - a
+        reference_angle = np.mean(wrapped_polar_angles) - threshold/4.
+        angle_differences = [angle_distance(reference_angle, b) for b in wrapped_polar_angles]
 
         # Segment
         segmented_group = {}
@@ -201,5 +203,5 @@ def prune_spot_groups(spot_groups: List[SpotGroup], min_spots=4):
     """Removes spot groups containing fewer than min_spots."""
 
     keep_group = lambda spot_group: len(spot_group) >= min_spots
-    pruned_spot_groups_iterator = filter(keep_group, spot_groups)
-    return list(pruned_spot_groups_iterator)
+    pruned_spot_groups = list(filter(keep_group, spot_groups))
+    return pruned_spot_groups

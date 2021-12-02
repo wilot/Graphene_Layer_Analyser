@@ -53,9 +53,22 @@ The errors for each spot are determined by firstly estimating the pixel-error fr
 
 Using this error-propogation approach, of the diffraction-patterns tested, the uncertainties appear to mostly be between 0.1% and 5%.
 
+## Examples
+
+### Successes
+<img src="examples/1_SAED.png" width="30%">
+<img src="examples/5_SAED.png" width="30%">
+<img src="examples/Camera%20Ceta%201359%20410%20mm___Raw.png" width="30%">
+![](examples/1_SAED.png){:width="30%"}
+![](examples/5_SAED.png){:width="30%}
+![](examples/Camera%20Ceta%201359%20410%20mm___Raw.png){:width="30%"}
+
+### Failures
+<img src="examples/13_SAED.png" width="30%">
+![](examples/13_SAED.png){width="30%"}
+
+
 ## Next Steps
 
-* Design a UI
-* Perfect failure detection
-* Implement UI
+* Design a GUI (CLI done)
 * Test under various noise environments
