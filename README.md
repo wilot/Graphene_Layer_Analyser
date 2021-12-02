@@ -10,9 +10,9 @@ This aims to be a convenient tool to implement a new metrology technique for mea
 
 To use the program, after installing necessary libraries and setting up your environment, type
 
-`python main.py filename -s`
+`python main.py -f filename -s`
 
-where filename is the name of the filename to be processed. The program can also analyse batches of filenames, specified as a list in the command line or, more conveniently, using wildcards in the terminal. The program requires an empty folder/directory to save files into. The flag `-s` commands the program to display the figure as well as save, and ought only be used when processing single files. By default, the program searches for `output` however this can be specified with `--output`. Currently parallelisation is not yet implemented. Help text can be accessed by typing `python main.py --help`.
+where filename is the name of the filename to be processed. The program can also analyse batches of filenames, specified as a list in the command line or, more conveniently, using wildcards in the terminal. The program requires an empty folder/directory to save files into. The flag `-s` commands the program to display the figure rather than save, and ought only be used when processing single files. By default, the program searches for `output` however this can be specified with `--output`. Currently parallelisation is not yet implemented. Help text can be accessed by typing `python main.py --help`.
 
 ## Manifest
 
@@ -21,8 +21,8 @@ Here an overview of the locations of important datastructures can be found. This
 * `pattern_processor.py` - Contains `process()` which actually analyses a diffraction pattern, as well as various datastructures for results and tunings.
 * `diffraction_spots.py` - The `SpotGroup` class definition and spot segmentation functions
 * `windows.py` - Contains classes and methods implementing the aperture photometry aspect of spot intensity integration
-* `user_interface.py` - The beginnings of a user interface...
-* `methods.py` - Contains miscellaneous methods. Might be remove and have its contents redistributed to other files soon...
+* `user_interface.py` - The user interface
+* `methods.py` - Contains miscellaneous methods.
 
 ## Techniques
 
