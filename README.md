@@ -62,12 +62,7 @@ Using this error-propogation approach, of the diffraction-patterns tested, the u
 ![](examples/5_SAED.png)
 ![](examples/Camera%20Ceta%201359%20410%20mm___Raw.png)
 
-### Failures
-
-![](examples/13_SAED.png)
-
-
 ## Next Steps
 
-* Design a GUI (CLI done)
+* Polish GUI
 * Test under various noise environments
