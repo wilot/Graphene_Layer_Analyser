@@ -45,23 +45,26 @@ class SpotGroup:
         return np.array(circumcentres)
 
     def calculate_integrated_intensity(self, image_window: windows.Window):
-        """Returns the summed, background corrected intensities of all spots in the group."""
+        """Returns the averaged, background corrected intensities of all spots in the group."""
 
-        intensities = []
-        uncertanties = []
+        intensities = []  # Summed counts within the spot
+        uncertainties = []  # Uncertainty of the spot as a result of background stddev, calculated from the
+        # background annulus
+
         for spot in self.spots:
             intensity, uncertainty = image_window.get_integrated_intensity(*spot)
             intensities.append(intensity)
             if uncertainty is not None:
-                uncertanties.append(uncertainty)
+                uncertainties.append(uncertainty)
 
         self.group_intensity = sum(intensities) / len(self)
-        if len(uncertanties) == 0:
+        if len(uncertainties) == 0:
             return
-        uncertanties = np.array(uncertanties)
-        uncertainty = np.sqrt(np.sum(uncertanties**2))
-        uncertainty /= len(self)
-        self.group_uncertainty = uncertainty
+        uncertainties = np.array(uncertainties)
+        uncertainty = np.sqrt(np.sum(uncertainties**2))
+        uncertainty /= len(self)  # Group uncertainty due to background noise
+
+        self.group_uncertainty = np.std(intensities)
 
     def __len__(self):
         return len(self.spots)

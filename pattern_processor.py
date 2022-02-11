@@ -33,17 +33,17 @@ class ConfigurableParameters:
         # A radius from the centre of the image that the central spot can be assumed to be within
         self.centre_within_radius = 200
         # Radial segmentation threshold of 0.2/nm
-        self.radial_group_threshold = 0.5 / image_axis_scale
+        self.radial_group_threshold = 2 / image_axis_scale
         if not (5 < self.radial_group_threshold < 50):  # Usually due to bad metadata
             self.radial_group_threshold = 60.  # Bit buggy, really ought to have the metadata!
         # Angular segmentation threshold (in degrees)
-        self.angular_group_threshold = 5.5
+        self.angular_group_threshold = 7.5
 
 
 class ProcessedResult:
     """Packages the results of the processing of a diffraction-pattern, including group intensities and result flags.
 
-    Contains the results of the processing of the diffraction-pattern, along with whether or not the processing was
+    Contains the results of the processing of the diffraction-pattern, along with whether the processing was
     deemed a success and the determined thickness of the Graphene sample. Note, a figure should be returned even if
     the analysis is deemed a failure. If a figure cannot be returned, an exception should be raised instead.
 

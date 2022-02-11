@@ -22,8 +22,22 @@ def command_line_invocation():
     print("End")
 
 
+def gui_invocation(filenames, output_dir, show=False, parallelize=True):
+    """Invoked by GUI!"""
+
+    parallelize = False
+
+    for filename, signal in zip(filenames, ui.load_signals(filenames)):
+        process_result = pattern_processor.process(signal)
+        figure = ui.plot(filename, process_result, show)
+        ui.save_figure(figure, output_dir, filename)
+
+    # Returns to GUI
+
+
 if __name__ == '__main__':
     command_line_invocation()
+    # ui.spinup_gui()
 
     # For debugging:
     # filename = "data/Duc-The's data/2_SAED.dm3"

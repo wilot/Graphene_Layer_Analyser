@@ -6,10 +6,14 @@ import os
 import argparse
 import sys
 from typing import List, Tuple
+import tkinter as tk
+from tkinter.font import Font as tkFont
 
+import tkinterdnd2
 import matplotlib.pyplot as plt
 import hyperspy.api as hs
 
+import main
 from diffraction_spots import SpotGroup
 from pattern_processor import ProcessedResult
 
@@ -82,7 +86,7 @@ def get_cli_arguments() -> Tuple[List[str], str, bool, bool]:
     parallel_help_text = "Parallelise the processing of files. Note, cannot be used with '--show'."
 
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("--filename", "-f", type=str, nargs="+", help=filename_help_text)
+    parser.add_argument("--filename", "-f", type=str, nargs="+", help=filename_help_text, required=True)
     parser.add_argument("--output", type=str, default="output", help=output_help_text)
     parser.add_argument("--show", "-s", action="store_true", help=show_help_text)
     parser.add_argument("--parallelize", "-p", action="store_true", help=parallel_help_text)
@@ -90,11 +94,16 @@ def get_cli_arguments() -> Tuple[List[str], str, bool, bool]:
     args = parser.parse_args()
 
     if args.filename is None:
-        # Start GUI
-        raise NotImplementedError("GUI not yet implemented.")
+        parser.print_usage()
+        sys.exit(0)
 
-    validate_filenames(args.filename)
-    validate_output_directory(args.output)
+    valid_filenames = validate_filenames(args.filename)
+    valid_output_directory = validate_output_directory(args.output)
+
+    if not valid_filenames or not valid_output_directory:
+        print("Failed to read filenames or output directory!")
+        sys.exit(1)
+
     if args.show and args.parallelize:
         print("Cannot both parallelise and show.")
         sys.exit(1)
@@ -106,7 +115,92 @@ def get_cli_arguments() -> Tuple[List[str], str, bool, bool]:
 # Graphical user interface #
 ############################
 
-# TODO: GUI
+# TODO: Improve GUI
+
+def spinup_gui():
+    """Starts the GUI"""
+
+    def main_handoff():
+        """Gathers arguments from the GUI and hands-off control to main.py"""
+        filenames = collect_files()
+        valid_filenames = validate_filenames(filenames, "gui")
+        output_directory = "output2/"  # TODO: Get from GUI
+        valid_output_directory = validate_output_directory(output_directory, "gui")
+        if not valid_filenames or not valid_output_directory:
+            sys.exit(1)  # TODO: GUI-ify
+        main.gui_invocation(filenames, output_directory)  # Handoff to main!
+
+    # Window setup
+    window = tkinterdnd2.TkinterDnD.Tk()
+    window.title("Graphene Layer Analyser")
+    width = 720
+    height = 480
+    screenwidth = window.winfo_screenwidth()
+    screenheight = window.winfo_screenheight()
+    alignstr = '%dx%d+%d+%d' % (width, height, (screenwidth - width) / 2, (screenheight - height) / 2)
+    window.geometry(alignstr)
+    window.resizable(width=False, height=False)
+
+    # Title-label setup
+    title_label = tk.Label(window)
+    ft = tkFont(family='Times', size=22)
+    title_label["font"] = ft
+    title_label["fg"] = "#333333"
+    title_label["justify"] = "center"
+    title_label["text"] = "Graphene Layer Analyser"
+    title_label.place(x=20,y=10,width=687,height=52)
+
+    # Directions-label setup
+    directions_label = tk.Label(window)
+    ft = tkFont(family='Times', size=14)
+    directions_label["font"] = ft
+    directions_label["fg"] = "#333333"
+    directions_label["justify"] = "center"
+    directions_label["text"] = "Drag and drop files to be processed, then press begin."
+    directions_label.place(x=20,y=70,width=349,height=38)
+
+    # Filenames-listbox setup
+    filenames_listbox = tk.Listbox(window)
+    filenames_listbox["borderwidth"] = "1px"
+    ft = tkFont(family='Times', size=12)
+    filenames_listbox["font"] = ft
+    filenames_listbox["fg"] = "#333333"
+    filenames_listbox["justify"] = "center"
+    filenames_listbox.place(x=340,y=70,width=369,height=388)
+
+    # Make filenames-listbox drag&drop able
+    filenames_listbox.drop_target_register(tkinterdnd2.DND_FILES)
+    filenames_listbox.dnd_bind("<<Drop>>", lambda event: filenames_listbox.insert("end", event.data))
+
+    def collect_files():
+        """Records all the filenames from the listbox"""
+        filenames = filenames_listbox.get(0, filenames_listbox.size()-1)  # The get method indices are inclusive...
+        print(f"{filenames=}")
+        print(f"type: {type(filenames)}")
+        return filenames
+
+    # Start-button setup
+    start_button = tk.Button(window)
+    start_button["bg"] = "#e9e9ed"
+    ft = tkFont(family='Times', size=14)
+    start_button["font"] = ft
+    start_button["fg"] = "#000000"
+    start_button["justify"] = "center"
+    start_button["text"] = "Begin"
+    start_button.place(x=20,y=130,width=298,height=35)
+    start_button["command"] = main_handoff
+
+    # Progress-message setup
+    progress_message = tk.Message(window)
+    ft = tkFont(family='Times', size=12)
+    progress_message["font"] = ft
+    progress_message["fg"] = "#333333"
+    progress_message["justify"] = "center"
+    progress_message["text"] = "Progress will be displayed here..."
+    progress_message.place(x=20,y=180,width=261,height=275)
+
+    window.mainloop()  # Blocking!
+
 
 ####################
 # Plotting methods #
@@ -176,23 +270,35 @@ def plot_group_intensities(ax: plt.Axes, spot_groups: List[SpotGroup]):
 # Validation #
 ##############
 
-def validate_filenames(filenames: List[str]):
+def validate_filenames(filenames: List[str], mode="cli"):
     """Checks filenames for their files' existence, removing invalid filenames. Returns True if filenames are valid,
     and a list of the invalid filenames otherwise. """
 
     invalid_filename = lambda filename: not os.path.isfile(filename)
     invalid_filenames_list = list(filter(invalid_filename, filenames))
     if len(invalid_filenames_list) == 0:
-        return
-    print("The following filenames were not recognized.")
-    print("\n".join(invalid_filenames_list))
-    sys.exit(1)
+        return True
+
+    if mode == "gui":
+        # TODO: Print debug to GUI
+        pass
+    else:
+        print("The following filenames were not recognized.")
+        print("\n".join(invalid_filenames_list))
+
+    return False
 
 
-def validate_output_directory(directory: str):
+def validate_output_directory(directory: str, mode="cli"):
     """Validates an output directory. Directory must exist and be empty"""
 
     if os.path.isdir(directory) and len(os.listdir(directory)) == 0:
-        return
-    print(f"The output directory '{directory}' was not found or was not empty.")
-    sys.exit(1)
+        return True
+
+    if mode == "gui":
+        # TODO: Print debug to GUI
+        pass
+    else:
+        print(f"The output directory '{directory}' was not found or was not empty.")
+
+    return False
