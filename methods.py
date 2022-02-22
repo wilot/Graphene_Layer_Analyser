@@ -6,11 +6,12 @@ import scipy.ndimage
 import matplotlib.pyplot as plt
 
 
-def centre_of_mass(image: np.ndarray, lower_threshold_abs, show=False):
+def centre_of_mass(image: np.ndarray, lower_threshold_abs, upper_threshold_abs, show=False):
     """Determines the centre of mass of an image where values below a certain absolute threshold are ignored."""
 
     clipped_image = image.copy()
-    clipped_image[clipped_image < lower_threshold_abs] = 0
+    # clipped_image[clipped_image < lower_threshold_abs] = 0
+    clipped_image = np.clip(clipped_image, lower_threshold_abs, upper_threshold_abs)
     com = scipy.ndimage.center_of_mass(clipped_image)
 
     if show:
@@ -27,11 +28,11 @@ def centre_of_mass(image: np.ndarray, lower_threshold_abs, show=False):
 def get_gaussian_fwhm(img, test_peak_coord):
     """Determines the gaussian FWHM of the peak at location specified by peak_coord."""
 
-    gaussian_fit_sub_window_half_size = (100, 100)
-    gaussian_fit_sub_window = img[test_peak_coord[0] - gaussian_fit_sub_window_half_size[0]:
-                                  test_peak_coord[0] + gaussian_fit_sub_window_half_size[0],
-                                  test_peak_coord[1] - gaussian_fit_sub_window_half_size[0]:
-                                  test_peak_coord[1] + gaussian_fit_sub_window_half_size[0]]
+    gaussian_fit_sub_window_half_size = (25, 25)
+    gaussian_fit_sub_window = img[max(test_peak_coord[0] - gaussian_fit_sub_window_half_size[0], 0):
+                                  min(test_peak_coord[0] + gaussian_fit_sub_window_half_size[0], img.shape[0]),
+                                  max(test_peak_coord[1] - gaussian_fit_sub_window_half_size[0], 0):
+                                  min(test_peak_coord[1] + gaussian_fit_sub_window_half_size[0], img.shape[1])]
 
     x = np.linspace(0, gaussian_fit_sub_window.shape[1], gaussian_fit_sub_window.shape[1])
     y = np.linspace(0, gaussian_fit_sub_window.shape[0], gaussian_fit_sub_window.shape[0])

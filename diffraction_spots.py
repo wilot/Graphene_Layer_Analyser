@@ -28,15 +28,16 @@ class SpotGroup:
         # Otherwise, can append the list as is
         self.spots = np.append(self.spots, spot)
 
-    def get_circumcentres(self, permitted_radius) -> Union[np.ndarray, None]:
-        """Returns a list of all the circumcentres (before a median is taken). For debugging."""
+    def get_circumcentres(self, permitted_radius, centre) -> np.ndarray:
+        """Returns a list of all the circumcentres (before a median is taken). Centre should be the centre of the
+        image and is used for a sanity-check on the output """
 
         if len(self.spots) < 3:
             raise RuntimeError("Not enough spots to calculate circumcentres.")
 
         triplets = self._generate_triplet_combinations()
         circumcentres = np.array([self._get_circumcentre(triplet) for triplet in triplets])
-        central_filter = lambda pos: not any(np.isnan(pos)) and np.linalg.norm(pos - (2048, 2048)) < permitted_radius
+        central_filter = lambda pos: not any(np.isnan(pos)) and np.linalg.norm(pos - centre) < permitted_radius
         circumcentres = [circ for circ in circumcentres if central_filter(circ)]
 
         if len(circumcentres) < 1:

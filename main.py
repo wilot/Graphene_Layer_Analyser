@@ -28,7 +28,11 @@ def gui_invocation(filenames, output_dir, show=False, parallelize=True):
     parallelize = False
 
     for filename, signal in zip(filenames, ui.load_signals(filenames)):
-        process_result = pattern_processor.process(signal)
+        try:
+            process_result = pattern_processor.process(signal)
+        except:
+            print(f"Failed to process {filename}")
+            continue
         figure = ui.plot(filename, process_result, show)
         ui.save_figure(figure, output_dir, filename)
 
