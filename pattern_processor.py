@@ -121,7 +121,7 @@ def refined_peak_radial_segmentation(peaks_list, peak_groups, params, central_pe
         central_spot = np.median(np.array(circumcentres), axis=0)
         peak_groups = diffraction_spots.group_radially(central_spot, peaks_list,
                                                        threshold=params.radial_group_threshold)
-        # peak_groups = diffraction_spots.prune_spot_groups(peak_groups, min_spots=3)
+        peak_groups = diffraction_spots.prune_spot_groups(peak_groups, min_spots=3)
         centrally_refined_peak_groups = peak_groups
         if len(centrally_refined_peak_groups) < 2:  # Central refinement might have actually made things worse...
             peak_groups = centrally_unrefined_peak_groups
@@ -143,6 +143,8 @@ def process(pattern: Signal2D) -> ProcessedResult:
     """Processes a diffraction pattern, analysing the spots and returning the results."""
 
     result = ProcessedResult()
+    if not pattern.axes_manager.navigation_axes == 0:  # The image is sneakily an image stack!
+        pattern = pattern.mean()
     pattern.data = np.nan_to_num(pattern.data)
     result.diffraction_pattern = pattern
     pattern_size = pattern.data.shape[0], pattern.data.shape[1]
@@ -153,7 +155,7 @@ def process(pattern: Signal2D) -> ProcessedResult:
     mask_grid_x -= centre[0]
     mask_grid_y -= centre[1]
     radial_distances = np.sqrt(mask_grid_x ** 2 + mask_grid_y ** 2)
-    mask_radius = int(0.12 * pattern_size[0])
+    mask_radius = int(0.15 * pattern_size[0])
     mask = radial_distances < mask_radius
     pattern.data[mask] = np.median(pattern.data.flatten())
     peaks_list = skimage.feature.peak_local_max(pattern.data, min_distance=int(pattern_size[0] / 50),
@@ -168,7 +170,7 @@ def process(pattern: Signal2D) -> ProcessedResult:
     result.outer_background_radius = params.outer_background_radius
 
     # Primary peak-finding
-    peaks_list = primary_peak_search(pattern, params.dilation_sigma, params.spot_min_separation)
+    peaks_list = primary_peak_search(pattern, params.dilation_sigma, params.spot_min_separation//3)
     # print(f"\t{len(peaks_list)} initially identified spots.")
     if len(peaks_list) > 40:  # Usually indicates insufficient image dilation, give it one last go
         print(f"\tToo many spots detected with initial image-dilation setting, assuming this is due to insufficient "
@@ -204,9 +206,11 @@ def process(pattern: Signal2D) -> ProcessedResult:
     subtended_angle = np.arcsin((params.outer_background_radius * 2) /
                                 np.linalg.norm(peak_groups[0].spots[0] - central_spot))
     subtended_angle = np.rad2deg(subtended_angle)
-    if params.angular_group_threshold * 0.5 < subtended_angle:
+    if params.angular_group_threshold * 0.5 > subtended_angle:
         params.angular_group_threshold = params.angular_group_threshold * 0.5
-    elif subtended_angle < params.angular_group_threshold * 1.5:
+    elif subtended_angle > params.angular_group_threshold * 1.5:
+        params.angular_group_threshold = params.angular_group_threshold * 1.5
+    elif np.isnan(subtended_angle):
         params.angular_group_threshold = params.angular_group_threshold * 1.5
     else:
         params.angular_group_threshold = subtended_angle
@@ -214,8 +218,8 @@ def process(pattern: Signal2D) -> ProcessedResult:
     # Now segment according to polar-angle too
     peak_groups = diffraction_spots.group_azimuthally(central_spot, peak_groups,
                                                       threshold=params.angular_group_threshold)
-    # print(f"Azimuthal segmentation performed with {params.angular_group_threshold=}°, while subtending angle "
-    #       f"{subtended_angle}°")
+    print(f"Azimuthal segmentation performed with {params.angular_group_threshold=}°, while subtending angle "
+          f"{subtended_angle}°")
 
     peak_groups_pruned = diffraction_spots.prune_spot_groups(peak_groups, min_spots=4)
     if len(peak_groups_pruned) > 1:

@@ -1,0 +1,11 @@
+name: graphene_layer_analyser
+channels:
+  - conda-forge
+dependencies:
+  - numpy=1.20
+  - matplotlib=3.4
+  - scikit-image=0.18
+  - hyperspy=1.6.4
+  - scipy=1.6
+  - future=0.18
+  - gagphil1::tkinterdnd2=0.3
